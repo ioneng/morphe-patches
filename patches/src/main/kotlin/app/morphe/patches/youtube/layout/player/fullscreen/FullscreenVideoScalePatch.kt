@@ -75,7 +75,8 @@ val fullscreenVideoScalePatch = patch(
 
     execute {
         PreferenceScreen.VIDEO.addPreferences(
-            ListPreference("morphe_fullscreen_video_scale")
+            ListPreference("morphe_fullscreen_video_scale"),
+            ListPreference("morphe_fullscreen_video_alignment")
         )
 
         addPlayerOverlayPreferences(
