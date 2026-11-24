@@ -1391,6 +1391,8 @@ Settings → Playback (or Autoplay) → Autoplay next video"</string>
     <string name="morphe_fullscreen_video_alignment_entry_top">Top</string>
     <string name="morphe_fullscreen_video_alignment_entry_center">Centre (default)</string>
     <string name="morphe_fullscreen_video_alignment_entry_bottom">Bottom</string>
+    <string name="morphe_fullscreen_video_alignment_button_title">Show video alignment button</string>
+    <string name="morphe_fullscreen_video_alignment_button_summary">Tap in fullscreen to cycle Centre, Top, and Bottom</string>
     <string name="morphe_fullscreen_video_scale_button_title">Show video scale button</string>
     <string name="morphe_fullscreen_video_scale_button_summary">Tap to cycle Default, Stretch, and Zoom</string>
     <string name="morphe_fullscreen_video_scale_button_fullscreen_only_title">Show only in fullscreen</string>

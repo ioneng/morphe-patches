@@ -70,9 +70,15 @@ public class FullscreenVideoScalePatch {
      * Position of the unscaled, fitted video within the fullscreen window.
      */
     public enum VideoVerticalAlignment {
-        TOP,
-        CENTER,
-        BOTTOM
+        TOP("morphe_fullscreen_video_alignment_top"),
+        CENTER("morphe_fullscreen_video_alignment_center"),
+        BOTTOM("morphe_fullscreen_video_alignment_bottom");
+
+        public final String iconBaseName;
+
+        VideoVerticalAlignment(String iconBaseName) {
+            this.iconBaseName = iconBaseName;
+        }
     }
 
     /**

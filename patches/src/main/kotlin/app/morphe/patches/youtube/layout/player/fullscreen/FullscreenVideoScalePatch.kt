@@ -36,6 +36,8 @@ private const val EXTENSION_PLAYER_VIEW_INTERFACE =
     $$"Lapp/morphe/extension/youtube/patches/FullscreenVideoScalePatch$PlayerViewInterface;"
 private const val EXTENSION_BUTTON =
     "Lapp/morphe/extension/youtube/videoplayer/FullscreenVideoScaleButton;"
+private const val EXTENSION_ALIGNMENT_BUTTON =
+    "Lapp/morphe/extension/youtube/videoplayer/FullscreenVideoAlignmentButton;"
 
 private val fullscreenVideoScaleResourcePatch = patch {
     dependsOn(
@@ -48,7 +50,10 @@ private val fullscreenVideoScaleResourcePatch = patch {
             "fullscreenvideoscalebutton",
             "morphe_fullscreen_video_scale_fit",
             "morphe_fullscreen_video_scale_stretch",
-            "morphe_fullscreen_video_scale_zoom"
+            "morphe_fullscreen_video_scale_zoom",
+            "morphe_fullscreen_video_alignment_top",
+            "morphe_fullscreen_video_alignment_center",
+            "morphe_fullscreen_video_alignment_bottom"
         )
 
         addLegacyBottomControl("fullscreenvideoscalebutton")
@@ -58,7 +63,7 @@ private val fullscreenVideoScaleResourcePatch = patch {
 @Suppress("unused")
 val fullscreenVideoScalePatch = patch(
     name = "Fullscreen video scale",
-    description = "Adds options to stretch or zoom videos to fill the screen in fullscreen mode.",
+    description = "Adds video scaling and vertical alignment options in fullscreen mode.",
 ) {
     dependsOn(
         sharedExtensionPatch,
@@ -82,12 +87,15 @@ val fullscreenVideoScalePatch = patch(
         addPlayerOverlayPreferences(
             noTitleUnsortedPreferenceCategory(
                 SwitchPreference("morphe_fullscreen_video_scale_button", summary = true),
-                SwitchPreference("morphe_fullscreen_video_scale_button_fullscreen_only", summary = true)
+                SwitchPreference("morphe_fullscreen_video_scale_button_fullscreen_only", summary = true),
+                SwitchPreference("morphe_fullscreen_video_alignment_button", summary = true)
             )
         )
 
         addPlayerBottomButton(EXTENSION_BUTTON)
+        addPlayerBottomButton(EXTENSION_ALIGNMENT_BUTTON)
         initializeLegacyBottomControl(EXTENSION_BUTTON)
+        initializeLegacyBottomControl(EXTENSION_ALIGNMENT_BUTTON)
         hookAdaptiveFormat("$EXTENSION_CLASS_VIDEO_SCALE->setVideoAspectRatio")
 
         YouTubePlayerOverlaysLayoutConstructorFingerprint.matchAll().forEach {
