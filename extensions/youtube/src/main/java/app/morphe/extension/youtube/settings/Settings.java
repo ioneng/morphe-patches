@@ -60,6 +60,7 @@ import app.morphe.extension.youtube.patches.FeedEngagementCountsPatch.FeedCounts
 import app.morphe.extension.youtube.patches.ForceAnimationsPatch.AnimationsMode;
 import app.morphe.extension.youtube.patches.ForceFullscreenLandscapePatch.LargeScreenAvailability;
 import app.morphe.extension.youtube.patches.FullscreenVideoScalePatch.VideoScaleMode;
+import app.morphe.extension.youtube.patches.FullscreenVideoScalePatch.VideoVerticalAlignment;
 import app.morphe.extension.youtube.patches.LegacyPlayerControlsPatch.RestoreOldPlayerButtonsAvailability;
 import app.morphe.extension.youtube.patches.LiveChatTranslatePatch.DeepLAvailability;
 import app.morphe.extension.youtube.patches.LiveChatTranslatePatch.TranslationProvider;
@@ -315,6 +316,7 @@ public class Settings extends SharedYouTubeSettings {
     public static final EnumSetting<FullscreenMode> EXIT_FULLSCREEN = new EnumSetting<>("morphe_exit_fullscreen", FullscreenMode.DISABLED);
     public static final BooleanSetting FORCE_FULLSCREEN_LANDSCAPE = new BooleanSetting("morphe_force_fullscreen_landscape", FALSE, new LargeScreenAvailability());
     public static final EnumSetting<VideoScaleMode> FULLSCREEN_VIDEO_SCALE = new EnumSetting<>("morphe_fullscreen_video_scale", VideoScaleMode.DEFAULT);
+    public static final EnumSetting<VideoVerticalAlignment> FULLSCREEN_VIDEO_ALIGNMENT = new EnumSetting<>("morphe_fullscreen_video_alignment", VideoVerticalAlignment.CENTER);
     public static final BooleanSetting HIDE_ASK_GEMINI_BUTTON = new BooleanSetting("morphe_hide_ask_gemini_button", FALSE);
     public static final BooleanSetting HIDE_AUTOPLAY_PREVIEW = new BooleanSetting("morphe_hide_autoplay_preview", FALSE, true);
     public static final BooleanSetting HIDE_CHANNEL_BAR = new BooleanSetting("morphe_hide_channel_bar", FALSE);
