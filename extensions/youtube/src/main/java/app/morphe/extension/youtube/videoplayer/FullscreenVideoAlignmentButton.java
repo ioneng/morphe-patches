@@ -84,8 +84,9 @@ public class FullscreenVideoAlignmentButton {
             return false;
         }
         PlayerType type = PlayerType.getCurrent();
-        return type == PlayerType.WATCH_WHILE_FULLSCREEN
-                || type == PlayerType.WATCH_WHILE_SLIDING_MAXIMIZED_FULLSCREEN;
+        return (type == PlayerType.WATCH_WHILE_FULLSCREEN
+                || type == PlayerType.WATCH_WHILE_SLIDING_MAXIMIZED_FULLSCREEN)
+                && FullscreenVideoScalePatch.hasVerticalAlignmentSpace();
     }
 
     private static void cycleAlignment() {

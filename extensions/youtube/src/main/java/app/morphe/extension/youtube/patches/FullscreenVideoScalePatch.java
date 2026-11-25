@@ -328,6 +328,35 @@ public class FullscreenVideoScalePatch {
         return Math.max(0, Math.min(spaceAbove, spaceBelow));
     }
 
+    /**
+     * Whether the fitted video has meaningful room to move vertically in the current window.
+     * Uses the same bounds as the alignment transform, including pinch zoom and open panels.
+     */
+    public static boolean hasVerticalAlignmentSpace() {
+        View playerView = resolvePlayerView();
+        if (playerView == null || playerView.getWidth() <= 0 || playerView.getHeight() <= 0
+                || !(playerView.getParent() instanceof View parent)) {
+            return false;
+        }
+
+        final int displayH = getDisplaySize()[1];
+        if (displayH <= 0) {
+            return false;
+        }
+
+        int[] location = new int[2];
+        parent.getLocationInWindow(location);
+        final float centerY = location[1] + playerView.getTop()
+                - parent.getScrollY() + playerView.getHeight() / 2f;
+        final float videoAR = getVideoAspectRatio(playerView,
+                playerView.getWidth(), playerView.getHeight());
+        final float pinchScale = DisableFullscreenGesturesPatch.getPinchScale();
+        final float freeSpace = getAlignmentSpace(playerView, centerY, displayH,
+                videoAR, pinchScale);
+        final float minimumSpace = 8f * playerView.getResources().getDisplayMetrics().density;
+        return freeSpace > minimumSpace;
+    }
+
     private static float getVideoAspectRatio(View view, int viewW, int viewH) {
         // The video view is sized to the video when the renderer does not letterbox the video itself.
         View child = view instanceof PlayerViewInterface player
