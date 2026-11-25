@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "2.3.0",
+  "version": "1.0.0",
   "patches": [
     {
       "name": "A-B loop",
@@ -6250,7 +6250,7 @@
     },
     {
       "name": "Fullscreen video scale",
-      "description": "Adds options to stretch or zoom videos to fill the screen in fullscreen mode.",
+      "description": "Adds video scaling and vertical alignment options in fullscreen mode.",
       "default": true,
       "category": null,
       "compatiblePackages": [
