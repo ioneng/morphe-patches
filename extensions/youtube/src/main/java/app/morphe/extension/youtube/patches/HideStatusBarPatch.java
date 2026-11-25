@@ -383,6 +383,15 @@ public final class HideStatusBarPatch {
         });
     }
 
+    /**
+     * Diagnostic injection point for the posture callbacks. Does not change window state.
+     * Compare this signal with the current player type on a foldable device.
+     */
+    public static void logTabletopState(boolean clamshell) {
+        Logger.printDebug(() -> "Tabletop probe: clamshell=" + clamshell
+                + ", player=" + PlayerType.getCurrent());
+    }
+
     private static void hideStatusBar(Activity activity) {
         if (!activities.add(activity)) {
             return;

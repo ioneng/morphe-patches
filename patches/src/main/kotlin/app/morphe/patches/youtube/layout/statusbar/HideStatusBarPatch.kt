@@ -7,10 +7,14 @@
 
 package app.morphe.patches.youtube.layout.statusbar
 
+import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.InstructionLocation.MatchAfterImmediately
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
+import app.morphe.patcher.opcode
 import app.morphe.patcher.patch.patch
+import app.morphe.patcher.util.getReference
 import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
 import app.morphe.patches.youtube.layout.buttons.navigation.translucentNavigationBarFeatureFlagsPatch
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
@@ -21,8 +25,10 @@ import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.patches.youtube.shared.YouTubeActivityOnCreateFingerprint
 import app.morphe.util.insertLiteralOverride
 import app.morphe.util.setExtensionIsPatchIncluded
+import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 
 private const val EXTENSION_CLASS = "Lapp/morphe/extension/youtube/patches/HideStatusBarPatch;"
 
@@ -69,6 +75,35 @@ val hideStatusBarPatch = patch(
                 it.instructionMatches.first().index,
                 "$EXTENSION_CLASS->useStatusBarScrollColor(Z)Z"
             )
+        }
+
+        // Experimental diagnostic hook. Resolve the posture classes by their stable
+        // debug string, rather than their obfuscated names. Older or newer targets
+        // may not have this exact callback shape; leave them unchanged.
+        ClamshellStateFingerprint.matchOrNull()?.let { state ->
+            val clamshellType = state.originalClassDef.type
+            state.originalClassDef.interfaces.singleOrNull()?.let { postureType ->
+                Fingerprint(
+                    returnType = "V",
+                    parameters = listOf(postureType),
+                    filters = listOf(
+                        opcode(Opcode.IGET_BOOLEAN),
+                        opcode(Opcode.INSTANCE_OF, location = MatchAfterImmediately()),
+                        opcode(Opcode.IPUT_BOOLEAN, location = MatchAfterImmediately()),
+                        opcode(Opcode.IF_NE, location = MatchAfterImmediately())
+                    )
+                ).matchAllOrNull()?.forEach { callback ->
+                    val instanceOf = callback.instructionMatches[1]
+                    if (instanceOf.instruction.getReference<TypeReference>()?.type == clamshellType) {
+                        val resultRegister = (instanceOf.instruction as TwoRegisterInstruction).registerA
+                        callback.method.addInstruction(
+                            instanceOf.index + 1,
+                            "invoke-static/range { v$resultRegister .. v$resultRegister }, " +
+                                "$EXTENSION_CLASS->logTabletopState(Z)V"
+                        )
+                    }
+                }
+            }
         }
 
         setExtensionIsPatchIncluded(EXTENSION_CLASS)

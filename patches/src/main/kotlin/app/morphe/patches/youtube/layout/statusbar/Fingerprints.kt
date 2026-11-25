@@ -12,6 +12,7 @@ import app.morphe.patcher.InstructionLocation.MatchAfterImmediately
 import app.morphe.patcher.fieldAccess
 import app.morphe.patcher.literal
 import app.morphe.patcher.methodCall
+import app.morphe.patcher.string
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 
@@ -94,5 +95,14 @@ internal object SystemWindowInsetsChangedFingerprint : Fingerprint(
             type = "Landroid/view/View;",
             location = MatchAfterImmediately()
         )
+    )
+)
+
+/** Stable string identifying YouTube's horizontal half-open posture class. */
+internal object ClamshellStateFingerprint : Fingerprint(
+    returnType = "Ljava/lang/String;",
+    parameters = listOf(),
+    filters = listOf(
+        string("ClamshellState{foldPositionY=")
     )
 )
