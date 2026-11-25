@@ -1,5 +1,6 @@
 /*
- * Copyright 2026 Morphe contributors.
+ * Copyright 2026 Morphe.
+ * https://github.com/MorpheApp/morphe-patches/pull/5307
  *
  * See the included NOTICE file for GPLv3 Section 7 terms that apply to this code.
  */
@@ -23,64 +24,77 @@ import app.morphe.extension.youtube.shared.PlayerType;
 
 @SuppressWarnings("unused")
 public class FullscreenVideoAlignmentButton {
+
     @Nullable
     private static LegacyPlayerControlButton legacy;
+
     private static WeakReference<ImageView> overlayButtonRef = new WeakReference<>(null);
 
-    /** Injection point for modern player controls. */
+    /**
+     * Injection point.
+     */
     public static void initializeButton(View controlsView) {
         try {
             if (LegacyPlayerControlsPatch.RESTORE_OLD_PLAYER_BUTTONS
                     || !Settings.FULLSCREEN_VIDEO_ALIGNMENT_BUTTON.get()) {
                 return;
             }
+
             ImageView added = PlayerOverlayButton.addButton(
                     controlsView,
                     PlayerIcons.name(Settings.FULLSCREEN_VIDEO_ALIGNMENT.get().iconBaseName),
-                    FullscreenVideoAlignmentButton::isButtonEnabled,
+                    FullscreenVideoAlignmentButton::isOverlayButtonEnabled,
                     view -> cycleAlignment(),
                     null
             );
             overlayButtonRef = new WeakReference<>(added);
         } catch (Exception ex) {
-            Logger.printException(() -> "initializeAlignmentButton failure", ex);
+            Logger.printException(() -> "initializeButton failure", ex);
         }
     }
 
-    /** Injection point for legacy player controls. */
+    /**
+     * Injection point.
+     */
     public static void initializeLegacyButton(View controlsView) {
         try {
             if (!LegacyPlayerControlsPatch.RESTORE_OLD_PLAYER_BUTTONS) {
                 return;
             }
+
             legacy = new LegacyPlayerControlButton(
                     controlsView,
                     "fullscreen_video_alignment_button",
                     null,
                     Settings.FULLSCREEN_VIDEO_ALIGNMENT.get().iconBaseName,
-                    () -> isButtonEnabled()
+                    () -> isOverlayButtonEnabled()
                             ? LegacyPlayerControlButton.ButtonVisibility.ENABLED
                             : LegacyPlayerControlButton.ButtonVisibility.DISABLED,
                     view -> cycleAlignment(),
                     null
             );
         } catch (Exception ex) {
-            Logger.printException(() -> "initializeLegacyAlignmentButton failure", ex);
+            Logger.printException(() -> "initializeLegacyButton failure", ex);
         }
     }
 
-    private static boolean isButtonEnabled() {
-        return Settings.FULLSCREEN_VIDEO_ALIGNMENT_BUTTON.get()
-                && PlayerType.getCurrent() == PlayerType.WATCH_WHILE_FULLSCREEN;
+    private static boolean isOverlayButtonEnabled() {
+        if (!Settings.FULLSCREEN_VIDEO_ALIGNMENT_BUTTON.get()
+                || !Settings.FULLSCREEN_VIDEO_ALIGNMENT.isAvailable()) {
+            return false;
+        }
+        PlayerType type = PlayerType.getCurrent();
+        return type == PlayerType.WATCH_WHILE_FULLSCREEN
+                || type == PlayerType.WATCH_WHILE_SLIDING_MAXIMIZED_FULLSCREEN;
     }
 
     private static void cycleAlignment() {
         try {
             VideoVerticalAlignment current = Settings.FULLSCREEN_VIDEO_ALIGNMENT.get();
             VideoVerticalAlignment next = switch (current) {
-                case CENTER -> VideoVerticalAlignment.TOP;
-                case TOP -> VideoVerticalAlignment.BOTTOM;
-                case BOTTOM -> VideoVerticalAlignment.CENTER;
+                case TOP -> VideoVerticalAlignment.CENTER;
+                case CENTER -> VideoVerticalAlignment.BOTTOM;
+                case BOTTOM -> VideoVerticalAlignment.TOP;
             };
             Settings.FULLSCREEN_VIDEO_ALIGNMENT.save(next);
             updateButtonIcon(next);
@@ -92,11 +106,14 @@ public class FullscreenVideoAlignmentButton {
 
     private static void updateButtonIcon(VideoVerticalAlignment alignment) {
         Utils.verifyOnMainThread();
+
         final int icon = PlayerIcons.id(alignment.iconBaseName);
+
         ImageView overlayButton = overlayButtonRef.get();
         if (overlayButton != null) {
             overlayButton.setImageResource(icon);
         }
+
         if (legacy != null) {
             legacy.setIcon(icon);
         }
