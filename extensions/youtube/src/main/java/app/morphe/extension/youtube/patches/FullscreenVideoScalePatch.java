@@ -39,7 +39,8 @@ import app.morphe.extension.youtube.shared.ShortsPlayerState;
  * current window instead.
  * <p>
  * Stretch fills the screen for any source aspect ratio by distorting.
- * Zoom covers the screen uniformly (crops). Default leaves YouTube letterboxing.
+ * Zoom covers the screen uniformly (crops). Default preserves the source aspect ratio.
+ * Vertical alignment can move the default fitted video within the fullscreen window.
  */
 @SuppressWarnings("unused")
 public class FullscreenVideoScalePatch {
@@ -61,6 +62,21 @@ public class FullscreenVideoScalePatch {
         public final String iconBaseName;
 
         VideoScaleMode(String iconBaseName) {
+            this.iconBaseName = iconBaseName;
+        }
+    }
+
+    /**
+     * Position of the unscaled, fitted video within the fullscreen window.
+     */
+    public enum VideoVerticalAlignment {
+        TOP("morphe_fullscreen_video_alignment_top"),
+        CENTER("morphe_fullscreen_video_alignment_center"),
+        BOTTOM("morphe_fullscreen_video_alignment_bottom");
+
+        public final String iconBaseName;
+
+        VideoVerticalAlignment(String iconBaseName) {
             this.iconBaseName = iconBaseName;
         }
     }
@@ -163,7 +179,7 @@ public class FullscreenVideoScalePatch {
         try {
             View target = resolvePlayerView();
 
-            if (!shouldScale() || Settings.FULLSCREEN_VIDEO_SCALE.get() == VideoScaleMode.DEFAULT) {
+            if (!shouldApplyTransform()) {
                 detachPreDraw();
                 restoreDefaultTransform(target);
                 return;
@@ -232,6 +248,18 @@ public class FullscreenVideoScalePatch {
         view.getLocationOnScreen(loc);
 
         VideoScaleMode mode = Settings.FULLSCREEN_VIDEO_SCALE.get();
+        if (mode == VideoScaleMode.DEFAULT) {
+            // Translate the fitted content without scaling, stretching or cropping it.
+            // Native letterboxing may be inside the player view, so use contentTop.
+            float destinationTop = switch (Settings.FULLSCREEN_VIDEO_ALIGNMENT.get()) {
+                case TOP -> 0f;
+                case CENTER -> (displayH - contentH) / 2f;
+                case BOTTOM -> displayH - contentH;
+            };
+            view.setTranslationY(destinationTop - (loc[1] + contentTop));
+            return;
+        }
+
         final float pinch = Math.max(1f, DisableFullscreenGesturesPatch.getPinchScale());
         if (mode == VideoScaleMode.ZOOM) {
             final float scale = Math.max(displayW / contentW, displayH / contentH) * pinch;
@@ -403,7 +431,7 @@ public class FullscreenVideoScalePatch {
 
         preDrawListener = () -> {
             try {
-                if (!shouldScale() || Settings.FULLSCREEN_VIDEO_SCALE.get() == VideoScaleMode.DEFAULT) {
+                if (!shouldApplyTransform()) {
                     View target = scaledViewRef.get();
                     if (target == null) {
                         target = resolvePlayerView();
@@ -465,6 +493,11 @@ public class FullscreenVideoScalePatch {
      *
      * @see <a href="https://github.com/MorpheApp/morphe-patches/issues/2652">#2652</a>
      */
+    private static boolean shouldApplyTransform() {
+        return shouldScale() && (Settings.FULLSCREEN_VIDEO_SCALE.get() != VideoScaleMode.DEFAULT
+                || Settings.FULLSCREEN_VIDEO_ALIGNMENT.get() != VideoVerticalAlignment.CENTER);
+    }
+
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean shouldScale() {
         return PlayerType.getCurrent() == PlayerType.WATCH_WHILE_FULLSCREEN;
