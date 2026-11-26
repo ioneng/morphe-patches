@@ -12,16 +12,43 @@ Target APK: YouTube 21.30.216 (1561187872). The APK itself is not included.
 
 ## Probe
 
-The existing Hide status bar patch now includes a diagnostic injection which resolves the clamshell class by its string and matches the two callback shapes. The injection logs the boolean result and the existing PlayerType. It does not change status bar visibility or add a setting.
+The first diagnostic build of the Hide status bar patch included an injection which resolves the clamshell class by its string and matches the two callback shapes. The injection logged the boolean result and the existing PlayerType without changing status bar visibility or adding a setting.
 
 Test on the N6 with Morphe debug logging enabled, the global hide status bar setting disabled, and a regular video active. Enter tabletop, leave tabletop, and repeat using Fold Switcher. Also check the home feed, miniplayer and normal fullscreen. Look for `Tabletop probe:` logs and record player states. Confirm callbacks track the UI rather than just the device posture.
 
-## Next implementation
+## Implementation design
 
 Keep the existing global setting and its saved value compatible. Add a tabletop-only mode after verifying the probe. Hide only the main player's status bar, restore it on leaving the tabletop player, and preserve stock fullscreen and navigation-bar handling. The existing status bar layout fix caches edge-to-edge flags for the session; do not switch those feature flags dynamically. Validate inset and display cutout handling separately.
 
-This is an uncompiled diagnostic prototype; it has not been run against a patched APK or tested on a device. Fingerprints need validation across supported targets before submitting upstream.
+The diagnostic build passed CI and was tested on the target APK. The functional implementation removes its temporary fingerprints.
 
 ## Device validation (26 November 2026)
 
-Five open/close cycles on OPPO Find N6 matched `ClamshellState` with `EngagementPanel open/closed: tabletop-controls`. The panel events preceded the posture callbacks in two cycles. The functional prototype therefore removes the diagnostic fingerprints and listens to the existing engagement panel and player type hooks. It retains the original global switch and adds a default-off, restart-required tabletop-only switch, with global hide taking precedence. With the layout fix enabled, the edge-to-edge flag is disabled for the entire session in either hide mode, as upstream already does for global hide; this can change the normal page layout and must be tested. No change to stock fullscreen or navigation bar is intentionally requested by the new controller. Runtime testing of bar restoration, insets, normal browsing, activity recreation, and minimization is still required. No device logs or APK are committed.
+Five open/close cycles on OPPO Find N6 matched `ClamshellState` with `EngagementPanel open/closed: tabletop-controls`. The panel events preceded the posture callbacks in two cycles. The functional prototype therefore removes the diagnostic fingerprints and listens to the existing engagement panel and player type hooks. It retains the original global switch and adds a default-off, restart-required tabletop-only switch, with global hide taking precedence. With the layout fix enabled, the edge-to-edge flag is disabled for the entire session in either hide mode, as upstream already does for global hide; this can change the normal page layout and must be tested. No change to stock fullscreen or navigation bar is intentionally requested by the new controller. The functional build passed CI at commit `15a784a` (run `45743764820`). No device logs or APK are committed.
+
+### Functional device results
+
+Device: OPPO Find N6, Android 17. Tested build: `15a784a`. The user reported the following results on 26 November 2026, with global hiding disabled and tabletop-only hiding enabled.
+
+| Test | Observed result |
+| --- | --- |
+| Home feed | Status bar visible |
+| Normal video player | Status bar visible |
+| Physical half-folded tabletop player | Status bar hidden |
+| Tabletop forced with Fold Switcher | Status bar hidden |
+| Leaving tabletop | Status bar restored |
+| Normal fullscreen | Unchanged |
+| Video layout in tabletop | Video occupies the former status bar space |
+| Minimize video while still half-folded | Status bar restored |
+
+YouTube returns to the normal player after unfolding from tabletop, even with tabletop-only hiding disabled. The user confirmed this is stock behaviour. Fullscreen restoration is outside the scope of this change.
+
+The later description-only commits explain the half-folded video and controls layout. They do not change runtime behaviour.
+
+## Pre-rebase review
+
+Keep the existing engagement panel dependency and the maximized-player guard. They distinguish the actual tabletop UI from physical device posture and prevent hiding the status bar in the miniplayer. Preserve the existing global hide setting and its priority. Do not toggle the cached edge-to-edge flag during playback.
+
+The current implementation has not been tested on other devices, with the layout fix disabled, with global hiding enabled, through all activity recreation paths, or in split-screen/PiP. The session-wide layout flag also affects the rest of YouTube when tabletop-only hiding is enabled; verify normal browsing and navigation-bar layout in the final regression test.
+
+Upstream dev at `59bdab6551474d69b82171057669d9bbf77831fe` adds a display-cutout avoidance option to the existing global status bar patch. Reconcile that option and the inset logic during rebase rather than replacing the upstream implementation. Retest the final rebased build.
