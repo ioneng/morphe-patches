@@ -702,9 +702,22 @@ public final class HideStatusBarPatch {
      */
     public static Rect getPlayerStableInsets(Rect insets) {
         if (FIX_STATUS_BAR_LAYOUT && insets.top != 0 && Boolean.FALSE.equals(edgeToEdgeTopBarUsed)) {
-            if (AVOID_CUTOUT && (isWatchingVideo || getHiddenTabletopStatusBar() != null)
-                    && !Settings.WINDOW_BELOW_STATUS_BAR.get()) {
-                return insets;
+            if (AVOID_CUTOUT && !Settings.WINDOW_BELOW_STATUS_BAR.get()) {
+                if (isWatchingVideo) {
+                    return insets;
+                }
+                TabletopStatusBar tabletop = getHiddenTabletopStatusBar();
+                if (tabletop != null) {
+                    WindowInsets windowInsets = tabletop.decorView.getRootWindowInsets();
+                    if (windowInsets == null) {
+                        return insets;
+                    }
+                    // The stable top inset can include the hidden status bar even when
+                    // the display cutout is on another edge of the folded screen.
+                    Rect playerInsets = new Rect(insets);
+                    playerInsets.top = getDisplayCutoutInsetTop(windowInsets);
+                    return playerInsets;
+                }
             }
             Rect playerInsets = new Rect(insets);
             playerInsets.top = 0;
