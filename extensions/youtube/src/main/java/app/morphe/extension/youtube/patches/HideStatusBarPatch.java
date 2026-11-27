@@ -17,6 +17,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.DisplayCutout;
+import android.view.Display;
+import android.view.WindowMetrics;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.SurfaceView;
@@ -515,6 +517,26 @@ public final class HideStatusBarPatch {
                         .append(", safeLeft=").append(cutout == null ? 0 : cutout.getSafeInsetLeft())
                         .append(", safeRight=").append(cutout == null ? 0 : cutout.getSafeInsetRight())
                         .append(", root=").append(describeProbeView(decorView));
+                Display display = decorView.getDisplay();
+                if (display != null) {
+                    result.append(", displayId=").append(display.getDisplayId())
+                            .append(", rotation=").append(display.getRotation());
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        result.append(", displayCutout=").append(display.getCutout());
+                    }
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    WindowMetrics current = activity.getWindowManager().getCurrentWindowMetrics();
+                    WindowMetrics maximum = activity.getWindowManager().getMaximumWindowMetrics();
+                    result.append(", currentBounds=").append(current.getBounds())
+                            .append(", currentCutout=").append(current.getWindowInsets().getDisplayCutout())
+                            .append(", currentCutoutInsets=").append(current.getWindowInsets()
+                                    .getInsetsIgnoringVisibility(WindowInsets.Type.displayCutout()))
+                            .append(", maximumBounds=").append(maximum.getBounds())
+                            .append(", maximumCutout=").append(maximum.getWindowInsets().getDisplayCutout())
+                            .append(", maximumCutoutInsets=").append(maximum.getWindowInsets()
+                                    .getInsetsIgnoringVisibility(WindowInsets.Type.displayCutout()));
+                }
                 appendProbeViews(decorView, result, 0);
                 String message = result.toString();
                 if (!message.equals(lastGeometryProbe)) {
@@ -552,7 +574,10 @@ public final class HideStatusBarPatch {
             view.getLocationInWindow(location);
             Rect visible = new Rect();
             boolean hasVisibleRect = view.getGlobalVisibleRect(visible);
+            int[] screenLocation = new int[2];
+            view.getLocationOnScreen(screenLocation);
             return view.getClass().getSimpleName() + " windowXY=" + location[0] + "," + location[1]
+                    + " screenXY=" + screenLocation[0] + "," + screenLocation[1]
                     + " size=" + view.getWidth() + "x" + view.getHeight()
                     + " visible=" + hasVisibleRect + ":" + visible
                     + " scale=" + view.getScaleX() + "," + view.getScaleY()
