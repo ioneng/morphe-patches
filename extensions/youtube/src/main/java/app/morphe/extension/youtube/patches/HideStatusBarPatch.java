@@ -60,6 +60,11 @@ public final class HideStatusBarPatch {
 
     private static final boolean FIX_STATUS_BAR_LAYOUT = Settings.FIX_STATUS_BAR_LAYOUT.get();
 
+    // Temporary diagnostic state: suppress repeated identical inset messages.
+    private static String lastCutoutLayoutProbe;
+    private static String lastCutoutPlayerProbe;
+    private static String lastCutoutContentProbe;
+
     /**
      * If the edge to edge top bar feature flag is turned off for the whole session even if it is
      * not read yet: with the status bar layout fix, and the status bar hidden or the window laid out
@@ -679,8 +684,24 @@ public final class HideStatusBarPatch {
                 return;
             }
 
+            final int incomingTop = systemWindowInsets.top;
             systemWindowInsets.top = watchingVideo && !AVOID_CUTOUT
                     ? 0 : getDisplayCutoutInsetTop(insets);
+            final int[] viewLocation = new int[2];
+            final int[] decorLocation = new int[2];
+            view.getLocationOnScreen(viewLocation);
+            decorView.getLocationOnScreen(decorLocation);
+            final String probe = "Cutout probe layout: inputTop=" + incomingTop
+                    + ", outputTop=" + systemWindowInsets.top
+                    + ", " + describeCutoutInsets(insets)
+                    + ", viewY=" + viewLocation[1] + ", windowY=" + decorLocation[1]
+                    + ", windowSize=" + decorView.getWidth() + "x" + decorView.getHeight()
+                    + ", watching=" + watchingVideo + ", avoid=" + AVOID_CUTOUT
+                    + ", tabletop=" + (getHiddenTabletopStatusBar() != null);
+            if (!probe.equals(lastCutoutLayoutProbe)) {
+                lastCutoutLayoutProbe = probe;
+                Logger.printDebug(() -> probe);
+            }
         } catch (Exception ex) {
             Logger.printException(() -> "setSystemWindowInsetTop failure", ex);
         }
@@ -704,13 +725,43 @@ public final class HideStatusBarPatch {
         if (FIX_STATUS_BAR_LAYOUT && insets.top != 0 && Boolean.FALSE.equals(edgeToEdgeTopBarUsed)) {
             if (AVOID_CUTOUT && (isWatchingVideo || getHiddenTabletopStatusBar() != null)
                     && !Settings.WINDOW_BELOW_STATUS_BAR.get()) {
-                return insets;
+                return logCutoutPlayerInsets(insets, insets);
             }
             Rect playerInsets = new Rect(insets);
             playerInsets.top = 0;
-            return playerInsets;
+            return logCutoutPlayerInsets(insets, playerInsets);
         }
-        return insets;
+        return logCutoutPlayerInsets(insets, insets);
+    }
+
+    private static Rect logCutoutPlayerInsets(Rect input, Rect output) {
+        if (HIDE_STATUS_BAR || HIDE_STATUS_BAR_TABLETOP) {
+            final String probe = "Cutout probe player: input=" + input + ", output=" + output
+                    + ", watching=" + isWatchingVideo
+                    + ", tabletop=" + (getHiddenTabletopStatusBar() != null)
+                    + ", avoid=" + AVOID_CUTOUT + ", fixLayout=" + FIX_STATUS_BAR_LAYOUT
+                    + ", edgeToEdge=" + edgeToEdgeTopBarUsed
+                    + ", windowBelowStatusBar=" + Settings.WINDOW_BELOW_STATUS_BAR.get();
+            if (!probe.equals(lastCutoutPlayerProbe)) {
+                lastCutoutPlayerProbe = probe;
+                Logger.printDebug(() -> probe);
+            }
+        }
+        return output;
+    }
+
+    private static String describeCutoutInsets(WindowInsets insets) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            DisplayCutout cutout = insets.getDisplayCutout();
+            return "status=" + insets.getInsets(WindowInsets.Type.statusBars())
+                    + ", stableStatus=" + insets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars())
+                    + ", cutout=" + insets.getInsets(WindowInsets.Type.displayCutout())
+                    + ", bounds=" + (cutout == null ? "none" : cutout.getBoundingRects())
+                    + ", statusVisible=" + insets.isVisible(WindowInsets.Type.statusBars());
+        }
+        return "systemTop=" + insets.getSystemWindowInsetTop()
+                + ", stableTop=" + insets.getStableInsetTop()
+                + ", cutoutTop=" + getDisplayCutoutInsetTop(insets);
     }
 
     private static int getDisplayCutoutInsetTop(WindowInsets insets) {
@@ -739,6 +790,7 @@ public final class HideStatusBarPatch {
         }
 
         content.setOnApplyWindowInsetsListener((view, insets) -> {
+            final String before = describeCutoutInsets(insets);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 Insets cutout = insets.getInsets(WindowInsets.Type.displayCutout());
                 Insets statusBars = insets.getInsets(WindowInsets.Type.statusBars());
@@ -756,6 +808,12 @@ public final class HideStatusBarPatch {
                             cutout.getSafeInsetTop(), insets.getSystemWindowInsetRight(),
                             insets.getSystemWindowInsetBottom());
                 }
+            }
+            final String probe = "Cutout probe content: before=[" + before
+                    + "], after=[" + describeCutoutInsets(insets) + "]";
+            if (!probe.equals(lastCutoutContentProbe)) {
+                lastCutoutContentProbe = probe;
+                Logger.printDebug(() -> probe);
             }
             return view.onApplyWindowInsets(insets);
         });
