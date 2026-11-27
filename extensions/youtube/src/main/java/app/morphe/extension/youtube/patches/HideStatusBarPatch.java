@@ -15,8 +15,12 @@ import android.graphics.Insets;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.view.DisplayCutout;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.SurfaceView;
+import android.view.TextureView;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -465,6 +469,8 @@ public final class HideStatusBarPatch {
          * System bars behavior before the status bar was hidden, restored when it is shown again.
          */
         private int systemBarsBehavior;
+        private long lastGeometryProbeTime;
+        private String lastGeometryProbe;
 
         private TabletopStatusBar(Activity activity) {
             this.activity = activity;
@@ -474,6 +480,7 @@ public final class HideStatusBarPatch {
             // The app shows the status bar again after some dialogs, and showing it can fail during
             // a posture change, so the state is checked again whenever the window is laid out.
             decorView.getViewTreeObserver().addOnGlobalLayoutListener(this::update);
+            decorView.getViewTreeObserver().addOnPreDrawListener(this::probeTabletopGeometry);
             postUpdate();
         }
 
@@ -482,6 +489,74 @@ public final class HideStatusBarPatch {
          */
         private void postUpdate() {
             decorView.post(this::update);
+        }
+
+        // Temporary diagnostic: observe the actual tabletop window instead of the optional
+        // fullscreen player layout callback. Do not change any layout or transforms.
+        private boolean probeTabletopGeometry() {
+            if (tabletopStatusBar.get() != this || !hidden || !isTabletopPlayer()) {
+                lastGeometryProbe = null;
+                return true;
+            }
+            long now = SystemClock.uptimeMillis();
+            if (now - lastGeometryProbeTime < 250) {
+                return true;
+            }
+            lastGeometryProbeTime = now;
+            try {
+                WindowInsets insets = decorView.getRootWindowInsets();
+                if (insets == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+                    return true;
+                }
+                DisplayCutout cutout = insets.getDisplayCutout();
+                StringBuilder result = new StringBuilder("Tabletop horizontal probe: avoid=")
+                        .append(AVOID_CUTOUT)
+                        .append(", cutout=").append(cutout == null ? "none" : cutout.getBoundingRects())
+                        .append(", safeLeft=").append(cutout == null ? 0 : cutout.getSafeInsetLeft())
+                        .append(", safeRight=").append(cutout == null ? 0 : cutout.getSafeInsetRight())
+                        .append(", root=").append(describeProbeView(decorView));
+                appendProbeViews(decorView, result, 0);
+                String message = result.toString();
+                if (!message.equals(lastGeometryProbe)) {
+                    lastGeometryProbe = message;
+                    Logger.printDebug(() -> message);
+                }
+            } catch (Exception ex) {
+                Logger.printException(() -> "Tabletop horizontal probe failure", ex);
+            }
+            return true;
+        }
+
+        private static void appendProbeViews(View view, StringBuilder result, int depth) {
+            if (depth > 40 || result.length() > 6000 || view.getVisibility() != View.VISIBLE) {
+                return;
+            }
+            String name = view.getClass().getName();
+            if (name.endsWith("YouTubePlayerViewNotForReflection")
+                    || name.endsWith("player.ui.PlayerView")
+                    || view instanceof SurfaceView || view instanceof TextureView) {
+                result.append(", target=").append(describeProbeView(view));
+                if (view.getParent() instanceof View parent) {
+                    result.append(", parent=").append(describeProbeView(parent));
+                }
+            }
+            if (view instanceof ViewGroup group) {
+                for (int i = 0; i < group.getChildCount(); i++) {
+                    appendProbeViews(group.getChildAt(i), result, depth + 1);
+                }
+            }
+        }
+
+        private static String describeProbeView(View view) {
+            int[] location = new int[2];
+            view.getLocationInWindow(location);
+            Rect visible = new Rect();
+            boolean hasVisibleRect = view.getGlobalVisibleRect(visible);
+            return view.getClass().getSimpleName() + " windowXY=" + location[0] + "," + location[1]
+                    + " size=" + view.getWidth() + "x" + view.getHeight()
+                    + " visible=" + hasVisibleRect + ":" + visible
+                    + " scale=" + view.getScaleX() + "," + view.getScaleY()
+                    + " translation=" + view.getTranslationX() + "," + view.getTranslationY();
         }
 
         private boolean isTabletopPlayer() {
