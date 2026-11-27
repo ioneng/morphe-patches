@@ -696,29 +696,12 @@ public final class HideStatusBarPatch {
      * the status bar hidden. Newer targets read the insets of the watch layout, which gets none because
      * the main view consumes them, but they start with the insets of the whole window if it already has them.
      * <p>
-     * With {@link Settings#HIDE_STATUS_BAR_AVOID_CUTOUT} the top inset is kept while watching a video,
-     * so the player stays below the display cutout. It is still removed when the window is already laid
-     * out below the status bar, to not add the room for the cutout twice.
+     * When cutout avoidance is enabled, setSystemWindowInsetTop() already supplies the
+     * actual top display cutout inset to the layout. Keeping the stable status bar inset
+     * here adds the clearance twice, or leaves a gap when the cutout is on another edge.
      */
     public static Rect getPlayerStableInsets(Rect insets) {
         if (FIX_STATUS_BAR_LAYOUT && insets.top != 0 && Boolean.FALSE.equals(edgeToEdgeTopBarUsed)) {
-            if (AVOID_CUTOUT && !Settings.WINDOW_BELOW_STATUS_BAR.get()) {
-                if (isWatchingVideo) {
-                    return insets;
-                }
-                TabletopStatusBar tabletop = getHiddenTabletopStatusBar();
-                if (tabletop != null) {
-                    WindowInsets windowInsets = tabletop.decorView.getRootWindowInsets();
-                    if (windowInsets == null) {
-                        return insets;
-                    }
-                    // The stable top inset can include the hidden status bar even when
-                    // the display cutout is on another edge of the folded screen.
-                    Rect playerInsets = new Rect(insets);
-                    playerInsets.top = getDisplayCutoutInsetTop(windowInsets);
-                    return playerInsets;
-                }
-            }
             Rect playerInsets = new Rect(insets);
             playerInsets.top = 0;
             return playerInsets;
