@@ -16,6 +16,9 @@ import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowMetrics;
+import android.view.WindowInsets;
+import android.view.DisplayCutout;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -30,6 +33,7 @@ import app.morphe.extension.shared.settings.Setting;
 import app.morphe.extension.shared.patches.VideoFormat.FormatInterface;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PlayerType;
+import app.morphe.extension.youtube.shared.EngagementPanel;
 import app.morphe.extension.youtube.shared.ShortsPlayerState;
 
 /**
@@ -115,6 +119,12 @@ public class FullscreenVideoScalePatch {
 
     private static volatile float videoAspectRatio = DEFAULT_VIDEO_ASPECT;
 
+    // Temporary geometry probe, independent of fullscreen scaling.
+    private static WeakReference<View> cutoutProbeHost = new WeakReference<>(null);
+    private static ViewTreeObserver.OnPreDrawListener cutoutProbeListener;
+    private static long lastCutoutProbeTime;
+    private static String lastCutoutProbe;
+
     @Nullable
     private static ViewTreeObserver.OnPreDrawListener preDrawListener;
     private static WeakReference<View> preDrawHostRef = new WeakReference<>(null);
@@ -161,6 +171,7 @@ public class FullscreenVideoScalePatch {
                 return;
             }
             playerViewRef = new WeakReference<>(playerView);
+            attachTabletopCutoutProbe(playerView);
             applyScaleOnMainThread();
         } catch (Exception ex) {
             Logger.printException(() -> "onPlayerViewLayout failure", ex);
@@ -196,6 +207,81 @@ public class FullscreenVideoScalePatch {
     public static void applyScale() {
         CaptionViewportPatch.onPresentationChanged();
         Utils.runOnMainThread(FullscreenVideoScalePatch::applyScaleOnMainThread);
+    }
+
+    private static void attachTabletopCutoutProbe(View host) {
+        if (!Settings.HIDE_STATUS_BAR_TABLETOP.get()
+                || !Settings.HIDE_STATUS_BAR_AVOID_CUTOUT.get()
+                || Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            return;
+        }
+        if (cutoutProbeHost.get() == host) {
+            return;
+        }
+        View previous = cutoutProbeHost.get();
+        if (previous != null && cutoutProbeListener != null
+                && previous.getViewTreeObserver().isAlive()) {
+            previous.getViewTreeObserver().removeOnPreDrawListener(cutoutProbeListener);
+        }
+        ViewTreeObserver observer = host.getViewTreeObserver();
+        if (!observer.isAlive()) {
+            return;
+        }
+        cutoutProbeHost = new WeakReference<>(host);
+        cutoutProbeListener = () -> {
+            View player = cutoutProbeHost.get();
+            if (player == null || !player.isAttachedToWindow()
+                    || PlayerType.getCurrent() != PlayerType.WATCH_WHILE_MAXIMIZED
+                    || !EngagementPanel.isTabletopOpen()) {
+                lastCutoutProbe = null;
+                return true;
+            }
+            long now = SystemClock.uptimeMillis();
+            if (now - lastCutoutProbeTime < 250) {
+                return true;
+            }
+            lastCutoutProbeTime = now;
+            try {
+                WindowInsets insets = player.getRootWindowInsets();
+                if (insets == null) {
+                    return true;
+                }
+                DisplayCutout cutout = insets.getDisplayCutout();
+                View video = player instanceof PlayerViewInterface p ? p.patch_getVideoView() : null;
+                String probe = "Tabletop horizontal probe: cutout="
+                        + (cutout == null ? "none" : cutout.getBoundingRects())
+                        + ", safeLeft=" + (cutout == null ? 0 : cutout.getSafeInsetLeft())
+                        + ", safeRight=" + (cutout == null ? 0 : cutout.getSafeInsetRight())
+                        + ", root=" + describeProbeView(player.getRootView())
+                        + ", player=" + describeProbeView(player)
+                        + ", video=" + describeProbeView(video)
+                        + ", videoAR=" + videoAspectRatio
+                        + ", pinchScale=" + DisableFullscreenGesturesPatch.getPinchScale();
+                if (!probe.equals(lastCutoutProbe)) {
+                    lastCutoutProbe = probe;
+                    Logger.printDebug(() -> probe);
+                }
+            } catch (Exception ex) {
+                Logger.printException(() -> "Tabletop horizontal probe failure", ex);
+            }
+            return true;
+        };
+        observer.addOnPreDrawListener(cutoutProbeListener);
+    }
+
+    private static String describeProbeView(@Nullable View view) {
+        if (view == null) {
+            return "none";
+        }
+        int[] location = new int[2];
+        view.getLocationInWindow(location);
+        Rect visible = new Rect();
+        boolean isVisible = view.getGlobalVisibleRect(visible);
+        return view.getClass().getSimpleName() + " windowXY=" + location[0] + "," + location[1]
+                + " size=" + view.getWidth() + "x" + view.getHeight()
+                + " visible=" + isVisible + ":" + visible
+                + " scale=" + view.getScaleX() + "," + view.getScaleY()
+                + " translation=" + view.getTranslationX() + "," + view.getTranslationY();
     }
 
     private static void applyScaleOnMainThread() {
